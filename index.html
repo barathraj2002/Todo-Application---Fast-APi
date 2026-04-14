@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Todo App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a, #020617);
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+
+      /* ✅ FIX */
+      align-items: flex-start;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    /* App Container */
+    .app {
+      width: 100%;
+      max-width: 600px;
+      padding: 30px;
+      border-radius: 20px;
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+
+      /* ✅ IMPORTANT */
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    /* Title */
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 25px;
+      font-weight: 600;
+    }
+
+    /* Input Row */
+    .row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: #0f172a;
+      color: white;
+      outline: none;
+      transition: 0.2s;
+    }
+
+    input:focus {
+      box-shadow: 0 0 0 2px #3b82f6;
+    }
+
+    /* Buttons */
+    button {
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      transition: 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(59,130,246,0.4);
+    }
+
+    button:disabled {
+      background: gray;
+      cursor: not-allowed;
+    }
+
+    /* Todo Card */
+    .todo {
+      background: rgba(15, 23, 42, 0.7);
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: 0.2s;
+    }
+
+    .todo:hover {
+      transform: scale(1.02);
+      background: rgba(30, 41, 59, 0.9);
+    }
+
+    /* Actions */
+    .actions button {
+      margin-left: 6px;
+      font-size: 12px;
+    }
+
+    .actions .edit {
+      background: #22c55e;
+    }
+
+    .actions .delete {
+      background: #ef4444;
+    }
+
+    /* Error */
+    .error {
+      background: rgba(239, 68, 68, 0.1);
+      padding: 8px;
+      border-radius: 8px;
+      color: #f87171;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      margin: 10px 0;
+      opacity: 0.7;
+    }
+
+    /* Empty */
+    .empty {
+      text-align: center;
+      opacity: 0.6;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h1>Todo App</h1>
+
+    <div id="error" class="error"></div>
+
+    <div class="row">
+      <input id="todoInput" placeholder="What needs to be done?" />
+      <button id="addBtn" onclick="addTodo()">➕ Add</button>
+    </div>
+
+    <div id="loading" class="loading"></div>
+
+    <div id="todoList"></div>
+  </div>
+
+  <script>
+    const BASE_URL = "http://127.0.0.1:8000";
+    function parseError(err) {
+      if (!err) return "Something went wrong";
+
+      if (Array.isArray(err.detail)) {
+        return err.detail.map(e => e.msg).join(", ");
+      }
+
+      if (typeof err.detail === "string") {
+        return err.detail;
+      }
+
+      return err.message || "Unknown error";
+    }
+
+    const todoList = document.getElementById("todoList");
+    const errorBox = document.getElementById("error");
+    const loadingBox = document.getElementById("loading");
+    const addBtn = document.getElementById("addBtn");
+
+    let isFetching = false;
+
+    function setLoading(state) {
+      loadingBox.innerText = state ? "Loading..." : "";
+      addBtn.disabled = state;
+    }
+
+    function setError(msg) {
+      errorBox.innerText = msg || "";
+      if (msg) {
+        setTimeout(() => (errorBox.innerText = ""), 3000);
+      }
+    }
+
+    async function fetchTodos() {
+      if (isFetching) return;
+      isFetching = true;
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const res = await fetch(`${BASE_URL}/todos`);
+
+        if (res.status === 404) {
+          renderTodos([]);
+          return;
+        }
+
+        const data = await res.json();
+        renderTodos(data);
+
+      } catch (err) {
+        setError(parseError(err));
+      }
+
+      setLoading(false);
+      isFetching = false;
+    }
+
+    function renderTodos(todos) {
+      todoList.innerHTML = "";
+
+      if (!todos || todos.length === 0) {
+        todoList.innerHTML = `<div class="empty">No todos yet 🚀</div>`;
+        return;
+      }
+
+      todos.forEach(todo => {
+        const div = document.createElement("div");
+        div.className = "todo";
+
+        const text = document.createElement("span");
+        text.innerText = todo.task; // ✅ FIXED
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const editBtn = document.createElement("button");
+        editBtn.innerText = "Edit";
+        editBtn.className = "edit";
+        editBtn.onclick = () => editTodo(todo);
+
+        const delBtn = document.createElement("button");
+        delBtn.innerText = "Delete";
+        delBtn.className = "delete";
+        delBtn.onclick = () => deleteTodo(todo.id);
+
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+
+        div.appendChild(text);
+        div.appendChild(actions);
+
+        todoList.appendChild(div);
+      });
+    }
+
+    async function addTodo() {
+      const input = document.getElementById("todoInput");
+      const value = input.value.trim();
+      if (!value) return;
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const res = await fetch(`${BASE_URL}/todos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: value }) // ✅ FIXED
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw err;
+        }
+
+        input.value = "";
+        await fetchTodos();
+
+      } catch (err) {
+        setError(parseError(err));
+      }
+
+      setLoading(false);
+    }
+
+    async function deleteTodo(id) {
+      setLoading(true);
+      setError("");
+
+      try {
+        const res = await fetch(`${BASE_URL}/todos/${id}`, {
+          method: "DELETE"
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw err;
+        }
+
+        await fetchTodos();
+
+      } catch (err) {
+        setError(parseError(err));
+      }
+
+      setLoading(false);
+    }
+
+    async function editTodo(todo) {
+      const newValue = prompt("Edit todo:", todo.task);
+      if (!newValue) return;
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const res = await fetch(`${BASE_URL}/todos/${todo.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: newValue }) // ✅ FIXED
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw err;
+        }
+
+        await fetchTodos();
+
+      } catch (err) {
+        setError(parseError(err));
+      }
+
+      setLoading(false);
+    }
+
+    // INIT (ONLY ONCE)
+    fetchTodos();
+  </script>
+</body>
+</html>
